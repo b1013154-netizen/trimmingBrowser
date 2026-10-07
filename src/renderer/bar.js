@@ -21,7 +21,7 @@ document.querySelectorAll('[data-act]').forEach(b => {
   b.onclick = () => {
     const act = b.dataset.act;
     if (act === 'menu') window.tb.invoke('bar:menu');
-    else window.tb.invoke('bar:action', act);
+    else window.tb.invoke('bar:action', act, b.dataset.v ? Number(b.dataset.v) : undefined);
   };
 });
 
@@ -31,17 +31,18 @@ op.oninput = () => {
   window.tb.invoke('bar:action', 'opacity', Number(op.value));
 };
 
-// つまみをドラッグして窓を移動する（ボタンを離すまで画面の外でも追いかける）
-const grip = $('#grip');
-grip.addEventListener('pointerdown', e => {
-  grip.setPointerCapture(e.pointerId);
-  window.tb.send('bar:dragStart', { x: e.screenX, y: e.screenY });
+// つまみをドラッグして窓を移動する／大きさを変える（ボタンを離すまで画面の外でも追いかける）
+document.querySelectorAll('[data-drag]').forEach(grip => {
+  grip.addEventListener('pointerdown', e => {
+    grip.setPointerCapture(e.pointerId);
+    window.tb.send('bar:dragStart', { x: e.screenX, y: e.screenY, mode: grip.dataset.drag });
+  });
+  grip.addEventListener('pointermove', e => {
+    if (grip.hasPointerCapture(e.pointerId)) window.tb.send('bar:dragMove', { x: e.screenX, y: e.screenY });
+  });
+  const end = () => window.tb.send('bar:dragEnd');
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('lostpointercapture', end);
 });
-grip.addEventListener('pointermove', e => {
-  if (grip.hasPointerCapture(e.pointerId)) window.tb.send('bar:dragMove', { x: e.screenX, y: e.screenY });
-});
-const end = () => window.tb.send('bar:dragEnd');
-grip.addEventListener('pointerup', end);
-grip.addEventListener('lostpointercapture', end);
 
 window.tb.on('bar:state', s => { st = s; render(); });

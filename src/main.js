@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, dialog, nativeImage, shell, screen } = require('electron');
+const { app, BaseWindow, BrowserWindow, WebContentsView, ipcMain, globalShortcut, Tray, Menu, dialog, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const store = require('./config');
@@ -99,96 +99,97 @@ function openHome(tab) {
 
 // ---------- 開く ----------
 // mode: 'chrome'（いつものブラウザ・ログイン状態のまま） / 'builtin'（内蔵ブラウザ・ログインなし）
-// w, h は画面の表示倍率を掛ける前の大きさ（physical = true のときは物理ピクセル。お気に入り用）
-async function openUrl({ url, mode, w, h, shape, physical }) {
+// w, h: 開く窓の大きさ（DIP）。exact = true のときは切り出しの座標系そのもの
+//   （内蔵ブラウザ: ページ表示部分の DIP、いつものブラウザ: 窓全体の物理ピクセル。お気に入り用）
+async function openUrl({ url, mode, w, h, shape, exact }) {
   const u = store.normalizeUrl(url);
   if (!u) throw new Error('URL を確認してください（例: https://www.youtube.com/）');
   store.addRecent(config, u);
   persist();
-  const scale = physical ? 1 : screen.getPrimaryDisplay().scaleFactor;
-  const size = { w: Math.round((w || config.general.windowW) * scale), h: Math.round((h || config.general.windowH) * scale) };
-  let target;
-  if (mode === 'builtin') {
-    target = await openBuiltin(u, size);
-  } else {
-    const b = browser.findBrowser(config.general);
-    if (!b) throw new Error('Chrome または Edge が見つかりません。設定の「ブラウザ」で場所を指定するか、内蔵ブラウザで開いてください。');
-    const hwnd = await browser.openAppWindow(b.path, u, size, process.pid);
-    target = { hwnd, kind: 'chrome', url: u };
-  }
-  // 物理ピクセルで大きさを合わせる（お気に入りの範囲がずれないように）
-  const r = win32.rectOf(target.hwnd);
-  if (r) win32.setBounds(target.hwnd, r.x, r.y, size.w, size.h);
-  return trim.create(target, { shape });
+  const size = { w: w || config.general.windowW, h: h || config.general.windowH };
+  if (mode === 'builtin') return trim.create(await openBuiltin(u, size), { shape });
+  const b = browser.findBrowser(config.general);
+  if (!b) throw new Error('Chrome または Edge が見つかりません。設定の「ブラウザ」で場所を指定するか、内蔵ブラウザで開いてください。');
+  const scale = exact ? 1 : screen.getPrimaryDisplay().scaleFactor;
+  const phys = { w: Math.round(size.w * scale), h: Math.round(size.h * scale) };
+  const hwnd = await browser.openAppWindow(b.path, u, size, process.pid);
+  const r = win32.rectOf(hwnd);
+  if (r) win32.setBounds(hwnd, r.x, r.y, phys.w, phys.h);
+  return trim.create({ hwnd, kind: 'chrome', url: u }, { shape });
 }
 
-// 内蔵ブラウザ: 普段のブラウザとは別の保存領域（ログインや履歴は共有しない）
-function openBuiltin(url, size) {
-  return new Promise((resolve, reject) => {
-    const scale = screen.getPrimaryDisplay().scaleFactor;
-    const w = new BrowserWindow({
-      width: Math.round(size.w / scale),
-      height: Math.round(size.h / scale),
-      title: '内蔵ブラウザ - TrimmingBrowser',
-      icon: ASSET('icon.png'),
-      autoHideMenuBar: true,
-      show: false,
-      backgroundColor: '#000000',
-      webPreferences: { partition: 'persist:builtin', contextIsolation: true, sandbox: true }
-    });
-    // Electron の名前を外して、一般的な Chrome と同じ User-Agent にする（サイトの表示崩れを避ける）
-    w.webContents.setUserAgent(w.webContents.getUserAgent().replace(/\s(Electron|TrimmingBrowser|trimming-browser)\/\S+/g, ''));
-    // 新しいウィンドウで開くリンクは同じウィンドウで開く
-    w.webContents.setWindowOpenHandler(({ url: next }) => {
-      if (/^https?:/i.test(next)) w.loadURL(next);
-      return { action: 'deny' };
-    });
-    w.webContents.on('before-input-event', (e, input) => {
-      if (input.type !== 'keyDown') return;
-      const wc = w.webContents;
-      if (input.alt && input.key === 'ArrowLeft' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
-      else if (input.alt && input.key === 'ArrowRight' && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
-      else if (input.key === 'F5') wc.reload();
-      else return;
-      e.preventDefault();
-    });
-    w.webContents.on('page-title-updated', () => pushState());
-    let done = false;
-    const ready = () => {
-      if (done || w.isDestroyed()) return;
-      done = true;
-      w.show();
-      resolve({ hwnd: win32.hwndOf(w), kind: 'builtin', url, builtin: w });
-    };
-    w.once('ready-to-show', ready);
-    // 表示に時間がかかるページでも、窓は出しておく（読み込みは続く）
-    setTimeout(ready, 8000);
-    w.loadURL(url).catch(err => {
-      // リダイレクトなどで最初の読み込みが中断されただけなら続ける
-      if (done || err.code === 'ERR_ABORTED') return;
-      done = true;
-      w.destroy();
-      reject(new Error(`ページを開けませんでした: ${err.message}`));
-    });
+// 内蔵ブラウザ: 普段のブラウザとは別の保存領域（ログインや履歴は共有しない）。
+// ページの表示部品（WebContentsView）は、切り出すと小窓へ移る
+async function openBuiltin(url, size) {
+  const w = new BaseWindow({
+    width: size.w,
+    height: size.h,
+    title: '内蔵ブラウザ - TrimmingBrowser',
+    icon: ASSET('icon.png'),
+    autoHideMenuBar: true,
+    backgroundColor: '#000000',
+    show: false
   });
+  w.setContentSize(size.w, size.h);
+  const view = new WebContentsView({ webPreferences: { partition: 'persist:builtin', contextIsolation: true, sandbox: true } });
+  view.setBackgroundColor('#000000');
+  w.contentView.addChildView(view);
+  const fit = () => {
+    const [cw, ch] = w.getContentSize();
+    view.setBounds({ x: 0, y: 0, width: cw, height: ch });
+  };
+  fit();
+  w.on('resize', fit);
+  w.on('closed', () => { if (!view.webContents.isDestroyed()) view.webContents.close(); });
+  const wc = view.webContents;
+  // Electron の名前を外して、一般的な Chrome と同じ User-Agent にする（サイトの表示崩れを避ける）
+  wc.setUserAgent(wc.getUserAgent().replace(/\s(Electron|TrimmingBrowser|trimming-browser)\/\S+/g, ''));
+  // 新しいウィンドウで開くリンクは同じウィンドウで開く
+  wc.setWindowOpenHandler(({ url: next }) => {
+    if (/^https?:/i.test(next)) wc.loadURL(next);
+    return { action: 'deny' };
+  });
+  wc.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return;
+    if (input.alt && input.key === 'ArrowLeft' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+    else if (input.alt && input.key === 'ArrowRight' && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
+    else if (input.key === 'F5') wc.reload();
+    else return;
+    e.preventDefault();
+  });
+  wc.on('page-title-updated', (_e, title) => {
+    if (!w.isDestroyed()) w.setTitle(`${title} - 内蔵ブラウザ`);
+    pushState();
+  });
+  w.show();
+  try {
+    await wc.loadURL(url);
+  } catch (err) {
+    // リダイレクトなどで最初の読み込みが中断されただけなら続ける
+    if (err.code !== 'ERR_ABORTED') {
+      w.destroy();
+      throw new Error(`ページを開けませんでした: ${err.message}`);
+    }
+  }
+  return { kind: 'builtin', url, browse: w, view, hwnd: win32.hwndOf(w) };
 }
 
 async function openFavorite(id) {
   const f = config.favorites.find(x => x.id === id);
   if (!f) throw new Error('お気に入りが見つかりません');
-  const s = await openUrl({ url: f.url, mode: f.mode, w: f.winW, h: f.winH, shape: f.crop.shape, physical: true });
+  const s = await openUrl({ url: f.url, mode: f.mode, w: f.winW, h: f.winH, shape: f.crop.shape, exact: true });
   s.opacity = f.opacity;
   s.topmost = f.topmost;
-  // ページの表示を待ってから切り抜く（内蔵ブラウザは読み込み完了を待つ）
-  if (s.builtin) await waitLoad(s.builtin);
-  await new Promise(r => setTimeout(r, s.builtin ? 300 : config.general.loadWaitMs));
-  trim.trimWith(s, f.crop, f.x == null ? null : { x: f.x, y: f.y });
+  // ページの表示を待ってから切り出す（内蔵ブラウザは読み込み完了を待つ）
+  if (s.view) await waitLoad(s.view.webContents);
+  await new Promise(r => setTimeout(r, s.view ? 300 : config.general.loadWaitMs));
+  trim.trimWith(s, f.crop, f.x == null ? null : { x: f.x, y: f.y, w: f.w });
 }
 
-function waitLoad(w) {
+function waitLoad(wc) {
   return new Promise(resolve => {
-    if (!w.webContents.isLoading()) return resolve();
-    w.webContents.once('did-stop-loading', resolve);
+    if (!wc.isLoading()) return resolve();
+    wc.once('did-stop-loading', resolve);
     setTimeout(resolve, 15000);
   });
 }

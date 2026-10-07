@@ -24,6 +24,9 @@ function lib() {
     GetClassNameW: user32.func('int __stdcall GetClassNameW(intptr_t hWnd, _Out_ uint16_t *lpClassName, int nMaxCount)'),
     GetWindowThreadProcessId: user32.func('uint32_t __stdcall GetWindowThreadProcessId(intptr_t hWnd, _Out_ uint32_t *lpdwProcessId)'),
     GetWindowRect: user32.func('bool __stdcall GetWindowRect(intptr_t hWnd, _Out_ TB_RECT *lpRect)'),
+    GetClientRect: user32.func('bool __stdcall GetClientRect(intptr_t hWnd, _Out_ TB_RECT *lpRect)'),
+    SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t hWndChild, intptr_t hWndNewParent)'),
+    GetParent: user32.func('intptr_t __stdcall GetParent(intptr_t hWnd)'),
     SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)'),
     ShowWindow: user32.func('bool __stdcall ShowWindow(intptr_t hWnd, int nCmdShow)'),
     GetForegroundWindow: user32.func('intptr_t __stdcall GetForegroundWindow()'),
@@ -48,6 +51,9 @@ const HWND_TOPMOST = -1;
 const HWND_NOTOPMOST = -2;
 const SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10, SWP_FRAMECHANGED = 0x20;
 const GWL_EXSTYLE = -20;
+const GWL_STYLE = -16;
+const WS_CHILD = 0x40000000, WS_POPUP = 0x80000000, WS_CAPTION = 0xC00000, WS_THICKFRAME = 0x40000, WS_MAXIMIZE = 0x1000000, WS_MINIMIZE = 0x20000000;
+const SW_SHOW = 5;
 const WS_EX_TOPMOST = 0x8, WS_EX_TRANSPARENT = 0x20, WS_EX_TOOLWINDOW = 0x80, WS_EX_LAYERED = 0x80000;
 const LWA_ALPHA = 0x2;
 const GW_OWNER = 4;
@@ -204,11 +210,56 @@ function hasRegion(hwnd) {
   return r !== 0; // 0 = ERROR（領域なし）
 }
 
+function clientSize(hwnd) {
+  if (!isWin) return null;
+  const r = {};
+  if (!lib().GetClientRect(hwnd, r)) return null;
+  return { w: r.right - r.left, h: r.bottom - r.top };
+}
+
+// 他のアプリの窓を、このアプリの窓（host）の中に子ウィンドウとして入れる。
+// 戻り値は元に戻すための情報（style・拡張スタイル・画面上の位置）
+function adopt(hwnd, host) {
+  if (!isWin) return null;
+  const a = lib();
+  const saved = { style: Number(a.GetWindowLongPtrW(hwnd, GWL_STYLE)), ex: getExStyle(hwnd), rect: rectOf(hwnd) };
+  // 子ウィンドウは 32 ビットの style を符号付きで扱うので、計算は >>> 0 で正の値にそろえる
+  const style = ((saved.style & ~(WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_MAXIMIZE | WS_MINIMIZE)) | WS_CHILD) >>> 0;
+  a.SetWindowLongPtrW(hwnd, GWL_STYLE, style | 0);
+  a.SetParent(hwnd, host);
+  a.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  a.ShowWindow(hwnd, SW_SHOW);
+  return saved;
+}
+
+// 子ウィンドウとして入れた窓を、元の独立した窓に戻す
+function release(hwnd, saved) {
+  if (!isWin || !lib().IsWindow(hwnd)) return;
+  const a = lib();
+  a.SetParent(hwnd, 0);
+  if (saved) {
+    a.SetWindowLongPtrW(hwnd, GWL_STYLE, saved.style | 0);
+    const r = saved.rect;
+    a.SetWindowPos(hwnd, HWND_NOTOPMOST, r.x, r.y, r.w, r.h, SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  }
+  a.ShowWindow(hwnd, SW_SHOW);
+}
+
+function parentOf(hwnd) {
+  return isWin ? Number(lib().GetParent(hwnd)) : 0;
+}
+
+// 子ウィンドウの位置と大きさ（親のクライアント座標・物理ピクセル）
+function placeChild(hwnd, x, y, w, h) {
+  if (isWin) lib().SetWindowPos(hwnd, 0, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 function close(hwnd) {
   if (isWin) lib().PostMessageW(hwnd, WM_CLOSE, 0, 0);
 }
 
 module.exports = {
   isWin, hwndOf, exists, rectOf, info, listWindows, foreground, prepare, setBounds,
-  setTopmost, isTopmost, getExStyle, setLook, restoreLook, applyRegion, clearRegion, hasRegion, close
+  setTopmost, isTopmost, getExStyle, setLook, restoreLook, applyRegion, clearRegion, hasRegion, close,
+  clientSize, adopt, release, parentOf, placeChild
 };

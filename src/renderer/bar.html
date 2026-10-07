@@ -8,17 +8,22 @@
 </head>
 <body>
 <div class="bar" id="pending">
+  <div class="grip" data-drag="move" title="ドラッグで移動">⠿</div>
   <span class="msg">見たい部分が映ったら</span>
   <button class="b primary" data-act="select">✂ 範囲を選ぶ</button>
   <button class="i" data-act="close" title="この窓を閉じる">✕</button>
 </div>
 <div class="bar" id="trimmed" hidden>
-  <div class="grip" id="grip" title="ドラッグで移動">⠿</div>
+  <div class="grip" data-drag="move" title="ドラッグで移動">⠿</div>
+  <button class="i" data-act="size" data-v="0.8" title="小さくする">−</button>
+  <div class="grip rs" data-drag="resize" title="左右にドラッグで大きさを変える">⇔</div>
+  <button class="i" data-act="size" data-v="1.25" title="大きくする">＋</button>
+  <span class="sep"></span>
   <button class="i" data-act="select" title="範囲・図形を選び直す">✂</button>
   <button class="i tg" data-act="topmost" id="topmost" title="常に最前面">📌</button>
   <label class="op" title="不透明度"><span>◐</span><input type="range" min="20" max="100" step="5" id="opacity"><span class="v" id="opv"></span></label>
   <button class="i tg" data-act="clickThrough" id="click" title="クリック透過（下の画面を操作できるようにする）">🖱</button>
-  <button class="i" data-act="favorite" id="fav" title="お気に入りに保存（ページ・範囲・位置を覚える）">★</button>
+  <button class="i" data-act="favorite" id="fav" title="お気に入りに保存（ページ・範囲・大きさ・位置を覚える）">★</button>
   <button class="i" data-act="restore" title="切り出しをやめて元の窓に戻す">⤺</button>
   <button class="i" data-act="menu" title="その他">⋯</button>
   <button class="i x" data-act="close" title="閉じる">✕</button>

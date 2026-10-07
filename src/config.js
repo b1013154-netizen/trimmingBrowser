@@ -54,6 +54,7 @@ function normalizeFavorite(f, g) {
   if (!f || typeof f !== 'object') return null;
   const url = normalizeUrl(f.url);
   if (!url) return null;
+  // 切り出したときの元の窓の大きさ（内蔵ブラウザ: ページ表示部分の DIP、それ以外: 物理ピクセル）
   const winW = int(f.winW, 200, 7680, g.windowW);
   const winH = int(f.winH, 150, 4320, g.windowH);
   const crop = shapes.normalizeCrop(f.crop, winW, winH);
@@ -66,8 +67,10 @@ function normalizeFavorite(f, g) {
     winW,
     winH,
     crop,
-    x: f.x == null ? null : int(f.x, -20000, 20000, 0), // 切り出した窓の左上（画面上の位置）
+    // 小窓の左上（画面上の位置・DIP）と幅。高さは範囲の縦横比から決まる
+    x: f.x == null ? null : int(f.x, -20000, 20000, 0),
     y: f.y == null ? null : int(f.y, -20000, 20000, 0),
+    w: int(f.w, 80, 8000, crop.w),
     opacity: int(f.opacity, 20, 100, g.opacity),
     topmost: bool(f.topmost, g.topmost)
   };

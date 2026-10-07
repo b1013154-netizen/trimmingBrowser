@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { BrowserWindow } = require('electron');
+const { BaseWindow, WebContentsView } = require('electron');
 
 const OUT = path.join(__dirname, '..', 'screenshots');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -27,12 +27,16 @@ module.exports = async function shots({ app, openHome, getHome, trim }) {
     await sleep(700);
     await page(home, `home-${tab}`);
   }
-  home.minimize();
+  home.hide();
 
-  // 内蔵ブラウザの代わりにデモページを開いて、操作バー・範囲選択を撮る
-  const w = new BrowserWindow({ x: 220, y: 160, width: 960, height: 600, title: '内蔵ブラウザ - TrimmingBrowser', autoHideMenuBar: true });
-  await w.loadFile(path.join(__dirname, 'demo.html'));
-  const s = trim.create({ hwnd: 1, kind: 'builtin', url: 'https://demo.example/', builtin: w });
+  // 内蔵ブラウザと同じ作り（BaseWindow + WebContentsView）でデモページを開いて、操作バー・範囲選択・小窓を撮る
+  const w = new BaseWindow({ x: 220, y: 160, width: 960, height: 600, title: '内蔵ブラウザ - TrimmingBrowser', autoHideMenuBar: true });
+  const view = new WebContentsView();
+  w.contentView.addChildView(view);
+  const [cw, ch] = w.getContentSize();
+  view.setBounds({ x: 0, y: 0, width: cw, height: ch });
+  await view.webContents.loadFile(path.join(__dirname, 'demo.html'));
+  const s = trim.create({ kind: 'builtin', url: 'https://demo.example/', browse: w, view, hwnd: 1 });
   await sleep(1200);
   screen('bar-pending');
 
@@ -43,16 +47,19 @@ module.exports = async function shots({ app, openHome, getHome, trim }) {
     sel = { x: init.win.x + 20, y: init.win.y + 76, w: 640, h: 360 }; shape = 'rounded'; render();`);
   await sleep(500);
   screen('select');
-  await sel.webContents.executeJavaScript(`
-    shape = 'polygon'; sel = null; draft = [[init.win.x + 60, init.win.y + 90], [init.win.x + 600, init.win.y + 110], [init.win.x + 640, init.win.y + 400]];
-    op = { kind: 'draft', x: init.win.x + 120, y: init.win.y + 420 }; render();`);
-  await sleep(500);
-  screen('select-polygon');
-  sel.tbFinish({ shape: 'rounded', x: 20, y: 76, w: 640, h: 360 });
-  await sleep(800);
+  sel.tbFinish({ shape: 'rect', x: 20, y: 76, w: 640, h: 360 });
+  await sleep(1000);
   s.bar.showInactive();
   await sleep(400);
   await page(s.bar, 'bar-trimmed');
-  screen('trimmed-linux');
+  screen('trimmed');
+  trim.action(s, 'size', 0.6);
+  await sleep(800);
+  screen('trimmed-small');
+  console.log('host', JSON.stringify(s.host.getBounds()), 'view', JSON.stringify(s.view.getBounds()), 'zoom', s.view.webContents.getZoomFactor());
+  trim.action(s, 'restore');
+  await sleep(600);
+  screen('restored');
+  console.log('restored zoom', s.view.webContents.getZoomFactor(), 'browse visible', w.isVisible());
   app.exit(0);
 };
