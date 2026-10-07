@@ -4,6 +4,8 @@
 //  小窓の大きさ・中身の拡大率・図形・不透明度・クリック透過・移動・元に戻す・閉じるを確かめる。
 //  画面のスクリーンショットを smoke-out/ に保存し、縮小版をログにも出す（IMG: で始まる行）。
 const fs = require('fs');
+// 異常終了しても途中までのログが残るよう、同期で書き出す
+const log = t => fs.writeSync(1, `${t}\n`);
 const path = require('path');
 const { desktopCapturer, screen } = require('electron');
 const shapes = require('../src/shapes');
@@ -17,7 +19,7 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
   const results = [];
   const check = (name, ok, detail = '') => {
     results.push({ name, ok: !!ok, detail });
-    console.log(`${ok ? 'OK  ' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`);
+    log(`${ok ? 'OK  ' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`);
   };
 
   async function shot(name) {
@@ -32,11 +34,11 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
   // 縮小した画面をログの最後にまとめて出す（成果物をダウンロードできない環境でも確認できるように）
   const dumpImages = () => {
     for (const [name, b64] of images.filter(([n]) => /trimmed|bigger|polygon/.test(n))) {
-      for (let i = 0; i < b64.length; i += 8000) console.log(`IMG:${name}:${b64.slice(i, i + 8000)}`);
+      for (let i = 0; i < b64.length; i += 8000) log(`IMG:${name}:${b64.slice(i, i + 8000)}`);
     }
   };
-  process.on('uncaughtException', e => console.log(`FAIL uncaughtException ${e.stack}`));
-  const step = t => console.log(`.. ${t}`);
+  process.on('uncaughtException', e => log(`FAIL uncaughtException ${e.stack}`));
+  const step = t => log(`.. ${t}`);
 
   const WS_EX_TRANSPARENT = 0x20;
 
@@ -147,8 +149,8 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
   dumpImages();
-  for (const r of results.filter(x => !x.ok)) console.log(`FAILED: ${r.name} ${r.detail}`);
+  for (const r of results.filter(x => !x.ok)) log(`FAILED: ${r.name} ${r.detail}`);
   const failed = results.filter(r => !r.ok).length;
-  console.log(`\n${results.length - failed}/${results.length} OK`);
+  log(`\n${results.length - failed}/${results.length} OK`);
   app.exit(failed ? 1 : 0);
 };

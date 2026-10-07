@@ -19,6 +19,8 @@ jobs:
       - run: npm run check
       # 実際に窓を開いて、切り抜き・最前面・不透明度・クリック透過・移動・元に戻すを確かめる
       - run: npx electron . --smoke
+        env:
+          TB_TRACE: "1"
         timeout-minutes: 5
       - uses: actions/upload-artifact@v4
         if: always()

@@ -30,6 +30,8 @@ function init(c) {
 }
 
 const isWin = win32.isWin;
+// TB_TRACE=1 のとき、処理の途中経過を標準出力に同期で書く（異常終了の調査用）
+const trace = t => { if (process.env.TB_TRACE) require('fs').writeSync(1, `   [trace] ${t}\n`); };
 const toDip = r => (isWin ? screen.screenToDipRect(null, r) : r);
 const dipRect = r => {
   const d = toDip({ x: r.x, y: r.y, width: r.w, height: r.h });
@@ -151,19 +153,24 @@ function trim(s, bounds) {
 
 // 小窓の大きさに合わせて、中身の位置と拡大率を決める
 function layout(s) {
+  trace('layout');
   if (!alive(s.host) || !s.crop) return;
   const c = s.crop;
   const size = s.host.getContentSize(); // DIP
   if (s.view) {
     const z = size[0] / c.w;
+    trace(`view.setBounds z=${z}`);
     s.view.setBounds({ x: Math.round(-c.x * z), y: Math.round(-c.y * z), width: Math.round(s.src.w * z), height: Math.round(s.src.h * z) });
+    trace('setZoomFactor');
     s.view.webContents.setZoomFactor(Math.min(5, Math.max(0.25, z)));
   } else if (isWin) {
     const cs = win32.clientSize(win32.hwndOf(s.host));
     const z = cs.w / c.w;
     win32.placeChild(s.hwnd, Math.round(-c.x * z), Math.round(-c.y * z), Math.round(s.src.w * z), Math.round(s.src.h * z));
   }
+  trace('applyShape');
   applyShape(s);
+  trace('layout done');
 }
 
 // 図形の形に小窓を切り抜く（四角形はそのまま）
@@ -426,6 +433,7 @@ function action(s, name, value) {
 
 // 小窓を中心を保ったまま拡大・縮小する（バーの − / ＋）
 function resizeBy(s, k) {
+  trace('resizeBy');
   if (!alive(s.host)) return;
   const b = s.host.getBounds();
   const w = Math.max(MIN_HOST, Math.round(b.width * k));
