@@ -123,6 +123,7 @@ function trim(s, bounds) {
   host.setAspectRatio(ratio);
   host.setMinimumSize(MIN_HOST, Math.max(30, Math.round(MIN_HOST / ratio)));
   s.host = host;
+  s.shapeKey = null;
 
   if (s.view) {
     host.contentView.addChildView(s.view);
@@ -154,7 +155,17 @@ function trim(s, bounds) {
 // 小窓の大きさに合わせて、中身の位置と拡大率を決める
 function layout(s) {
   trace('layout');
-  if (!alive(s.host) || !s.crop) return;
+  // 窓の領域を変えると Windows から大きさ変更の通知が来て、また layout が呼ばれるので、入れ子にしない
+  if (!alive(s.host) || !s.crop || s.inLayout) return;
+  s.inLayout = true;
+  try {
+    layoutNow(s);
+  } finally {
+    s.inLayout = false;
+  }
+}
+
+function layoutNow(s) {
   const c = s.crop;
   const size = s.host.getContentSize(); // DIP
   if (s.view) {
@@ -178,8 +189,12 @@ function applyShape(s) {
   if (!alive(s.host)) return;
   if (!isWin) return; // Windows 以外（画面確認用）は四角形のまま
   const hwnd = win32.hwndOf(s.host);
-  if (s.shape === 'rect') return win32.clearRegion(hwnd);
   const cs = win32.clientSize(hwnd);
+  // 図形と大きさが変わっていなければ設定し直さない
+  const key = `${s.shape}:${cs.w}x${cs.h}:${JSON.stringify(s.crop)}`;
+  if (key === s.shapeKey) return;
+  s.shapeKey = key;
+  if (s.shape === 'rect') return win32.clearRegion(hwnd);
   const k = cs.w / s.crop.w;
   const c = s.crop;
   const scaled = { shape: c.shape, x: 0, y: 0, w: cs.w, h: cs.h };
