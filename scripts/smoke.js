@@ -26,9 +26,17 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
     const [src] = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
     if (!src) return;
     fs.writeFileSync(path.join(OUT, `${name}.png`), src.thumbnail.toPNG());
-    const small = src.thumbnail.resize({ width: 640 }).toJPEG(55).toString('base64');
-    for (let i = 0; i < small.length; i += 4000) console.log(`IMG:${name}:${small.slice(i, i + 4000)}`);
+    images.push([name, src.thumbnail.resize({ width: 480 }).toJPEG(45).toString('base64')]);
   }
+  const images = [];
+  // 縮小した画面をログの最後にまとめて出す（成果物をダウンロードできない環境でも確認できるように）
+  const dumpImages = () => {
+    for (const [name, b64] of images.filter(([n]) => /trimmed|bigger|polygon/.test(n))) {
+      for (let i = 0; i < b64.length; i += 8000) console.log(`IMG:${name}:${b64.slice(i, i + 8000)}`);
+    }
+  };
+  process.on('uncaughtException', e => console.log(`FAIL uncaughtException ${e.stack}`));
+  const step = t => console.log(`.. ${t}`);
 
   const WS_EX_TRANSPARENT = 0x20;
 
@@ -55,6 +63,7 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
     check(`${label}: 最前面`, s.host.isAlwaysOnTop());
     await shot(`${label}-1-trimmed`);
 
+    step('拡大');
     // 拡大（＋ボタン）: 小窓が 1.25 倍になり、中身も同じ比率で拡大する
     trim.action(s, 'size', 1.25);
     await sleep(800);
@@ -69,6 +78,7 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
     }
     await shot(`${label}-2-bigger`);
 
+    step('つまみ');
     // つまみで大きさ変更・移動
     const b0 = s.host.getBounds();
     trim.dragStart(s, { x: 100, y: 100, mode: 'resize' });
@@ -83,8 +93,10 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
     const b2 = s.host.getBounds();
     check(`${label}: ドラッグで移動`, b2.x === b1.x + 60 && b2.y === b1.y + 30, `${b1.x},${b1.y} → ${b2.x},${b2.y}`);
 
+    step('図形');
     // 図形（切り出しをやめて、図形を変えて切り出し直す）
     for (const sh of shapes.SHAPE_IDS) {
+      step(`図形 ${sh}`);
       trim.action(s, 'restore');
       const crop = sh === 'polygon'
         ? { shape: sh, points: [[60, 60], [300, 90], [260, 260], [90, 220]] }
@@ -134,6 +146,8 @@ module.exports = async function smoke({ app, openUrl, trim, win32 }) {
   }
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
+  dumpImages();
+  for (const r of results.filter(x => !x.ok)) console.log(`FAILED: ${r.name} ${r.detail}`);
   const failed = results.filter(r => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} OK`);
   app.exit(failed ? 1 : 0);
