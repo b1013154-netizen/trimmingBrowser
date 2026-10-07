@@ -1,0 +1,70 @@
+{
+  "name": "trimming-browser",
+  "productName": "TrimmingBrowser",
+  "version": "1.0.0",
+  "description": "ブラウザ（や任意のウィンドウ）の好きな範囲だけを切り出して、枠なしの小窓で表示するツール",
+  "main": "src/main.js",
+  "author": "takuya",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "check": "node scripts/check.js",
+    "smoke": "electron . --smoke",
+    "dist": "electron-builder --win nsis portable --x64"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "io.github.b1013154netizen.trimmingbrowser",
+    "productName": "TrimmingBrowser",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "build/tray.png",
+      "package.json",
+      "!**/node_modules/koffi/build/koffi/{darwin_*,linux_*,freebsd_*,openbsd_*,musl_*,win32_arm64,win32_ia32}/**",
+      "!**/node_modules/koffi/{src,doc,vendor}/**"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "TrimmingBrowser",
+      "artifactName": "TrimmingBrowser-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "TrimmingBrowser-Portable-${version}.exe"
+    },
+    "extraResources": [
+      {
+        "from": "docs",
+        "to": "docs"
+      }
+    ],
+    "electronLanguages": [
+      "ja",
+      "en-US"
+    ]
+  }
+}

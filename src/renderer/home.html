@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>TrimmingBrowser</title>
+<link rel="stylesheet" href="home.css">
+</head>
+<body>
+<div class="titlebar"><span class="app-name">TrimmingBrowser</span><span class="saved" id="saved">変更は自動で保存されます</span></div>
+<div class="layout">
+  <nav class="side">
+    <div class="brand">
+      <div class="logo">✂</div>
+      <div><div class="brand-name">TrimmingBrowser</div><div class="brand-sub">好きな範囲だけを小窓で</div></div>
+    </div>
+    <button class="nav on" data-tab="open"><span>🌐</span>開いて切り出す</button>
+    <button class="nav" data-tab="windows"><span>🪟</span>開いている窓から</button>
+    <button class="nav" data-tab="favorites"><span>★</span>お気に入り</button>
+    <button class="nav" data-tab="settings"><span>⚙️</span>設定</button>
+    <button class="nav" data-tab="help"><span>📖</span>ヘルプ（説明書）</button>
+    <div class="side-foot" id="version"></div>
+  </nav>
+  <main id="main">
+    <section class="tab on" id="tab-open"></section>
+    <section class="tab" id="tab-windows"></section>
+    <section class="tab" id="tab-favorites"></section>
+    <section class="tab" id="tab-settings"></section>
+    <section class="tab" id="tab-help"></section>
+  </main>
+</div>
+<div class="modal-back" id="modal"></div>
+<div class="snack" id="snack"></div>
+<script src="../shapes.js"></script>
+<script src="markdown.js"></script>
+<script src="home.js"></script>
+</body>
+</html>

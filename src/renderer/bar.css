@@ -1,0 +1,29 @@
+:root { --accent: #19b3a6; --font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Noto Sans JP", sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font: 12.5px/1 var(--font); user-select: none; }
+.bar {
+  height: 36px;
+  margin: 2px;
+  display: flex; align-items: center; gap: 2px;
+  padding: 0 4px;
+  border-radius: 12px;
+  background: rgba(24, 26, 36, .92);
+  color: #e6e8f2;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.bar[hidden] { display: none; }
+.msg { padding: 0 6px 0 8px; color: #b9bdd0; white-space: nowrap; }
+.b { all: unset; padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.b.primary { background: var(--accent); color: #fff; }
+.b.primary:hover { background: #14988d; }
+.i { all: unset; width: 32px; height: 28px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; font-size: 14px; color: #e6e8f2; }
+.i:hover { background: rgba(255,255,255,.12); }
+.i.tg.on { background: rgba(25,179,166,.35); box-shadow: inset 0 0 0 1px var(--accent); }
+.i.x:hover { background: #c4314b; }
+.i:disabled { opacity: .3; cursor: default; background: transparent; }
+.grip { width: 22px; height: 28px; display: grid; place-items: center; cursor: grab; color: #8f93a8; font-size: 16px; border-radius: 8px; }
+.grip:hover { background: rgba(255,255,255,.08); color: #fff; }
+.grip:active { cursor: grabbing; }
+.op { display: flex; align-items: center; gap: 4px; padding: 0 6px; color: #b9bdd0; }
+.op input { width: 90px; accent-color: var(--accent); }
+.op .v { width: 32px; font-variant-numeric: tabular-nums; font-size: 11.5px; }

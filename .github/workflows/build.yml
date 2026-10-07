@@ -1,0 +1,37 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      # 実際に窓を開いて、切り抜き・最前面・不透明度・クリック透過・移動・元に戻すを確かめる
+      - run: npx electron . --smoke
+        timeout-minutes: 5
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screenshots
+          path: smoke-out/
+      - run: npx electron-builder --win nsis portable --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TrimmingBrowser-Windows
+          path: |
+            dist/*.exe
+            docs/*.md
+          if-no-files-found: error

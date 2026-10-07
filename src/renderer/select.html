@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>範囲を選ぶ</title>
+<link rel="stylesheet" href="select.css">
+</head>
+<body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg">
+  <path id="outside" fill-rule="evenodd"/>
+  <path id="dim" fill-rule="evenodd"/>
+  <rect id="frame"/>
+  <path id="sel"/>
+  <polyline id="draft"/>
+  <g id="handles"></g>
+</svg>
+<div class="tools" id="tools">
+  <div class="title" id="title"></div>
+  <div class="shapes" id="shapes"></div>
+  <div class="sep"></div>
+  <button class="b" id="reset" title="選び直す">やり直す</button>
+  <button class="b" id="cancel" title="Esc">キャンセル</button>
+  <button class="b primary" id="ok" title="Enter">✂ 切り出す</button>
+</div>
+<div class="hint" id="hint"></div>
+<script src="../shapes.js"></script>
+<script src="select.js"></script>
+</body>
+</html>
